@@ -316,10 +316,10 @@ public class MediaPickerActivity extends AppCompatActivity implements
     private void syncIconMenu(int mediaType) {
         switch (mediaType) {
             case MediaItem.PHOTO:
-                mMediaSwitcher.setIcon(R.drawable.ab_picker_video_2);
+                mMediaSwitcher.setIcon(R.drawable.gallery_video);
                 break;
             case MediaItem.VIDEO:
-                mMediaSwitcher.setIcon(R.drawable.ab_picker_camera2);
+                mMediaSwitcher.setIcon(R.drawable.gallery_photo);
                 break;
             default:
                 break;
