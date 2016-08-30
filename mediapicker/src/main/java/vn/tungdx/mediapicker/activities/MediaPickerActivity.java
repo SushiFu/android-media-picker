@@ -1,10 +1,12 @@
 package vn.tungdx.mediapicker.activities;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.DialogInterface;
 import android.content.DialogInterface.OnClickListener;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -12,9 +14,11 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.FileObserver;
 import android.provider.MediaStore;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentTransaction;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.Menu;
@@ -95,7 +99,8 @@ public class MediaPickerActivity extends AppCompatActivity implements
     private List<File> mFilesCreatedWhileCapturePhoto;
     private RecursiveFileObserver mFileObserver;
     private FileObserverTask mFileObserverTask;
-
+    private static final int PERMISSION_CAMERA              = 2;
+    private static final int PERMISSION_VIDEO               = 3;
     /**
      * Start {@link MediaPickerActivity} in {@link Activity} to pick photo or
      * video that depends on {@link MediaOptions} passed.
@@ -329,7 +334,44 @@ public class MediaPickerActivity extends AppCompatActivity implements
         finish();
     }
 
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case PERMISSION_CAMERA:
+                if ((grantResults.length > 0) && (grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
+                    useCamera();
+                }
+                break;
+            case PERMISSION_VIDEO:
+                if ((grantResults.length > 0) && (grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
+                    useVideo();
+                }
+                break;
+            default:
+                break;
+            // other 'case' lines to check for other
+            // permissions this app might request
+        }
+    }
+
+    private void askPermissionCamera(){
+        int permissionCheck = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA);
+
+        if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(
+                    this, new String[]{Manifest.permission.CAMERA}, PERMISSION_CAMERA);
+        } else {
+            useCamera();
+        }
+    }
+
     private void takePhoto() {
+        askPermissionCamera();
+    }
+
+    private void useCamera(){
         Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
             File file = mMediaOptions.getPhotoFile();
@@ -361,7 +403,7 @@ public class MediaPickerActivity extends AppCompatActivity implements
         }
     };
 
-    private void takeVideo() {
+    private void useVideo(){
         final Intent takeVideoIntent = new Intent(
                 MediaStore.ACTION_VIDEO_CAPTURE);
         if (takeVideoIntent.resolveActivity(getPackageManager()) != null) {
@@ -392,6 +434,21 @@ public class MediaPickerActivity extends AppCompatActivity implements
                 startActivityForResult(takeVideoIntent, REQUEST_VIDEO_CAPTURE);
             }
         }
+    }
+
+    private void askPermissionVideo(){
+        int permissionCheck = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA);
+
+        if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(
+                    this, new String[]{Manifest.permission.CAMERA}, PERMISSION_VIDEO);
+        } else {
+            useVideo();
+        }
+    }
+
+    private void takeVideo() {
+        askPermissionVideo();
     }
 
     /**
