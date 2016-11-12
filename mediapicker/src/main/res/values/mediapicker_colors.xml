@@ -6,4 +6,7 @@
     <color name="picker_grid_state_focused">#FFB0BE</color>
     <color name="picker_color">#FFB0BE</color>
 
+    <color name="flatBlackDark">#262626</color>
+    <color name="flatGreen">#2ECC70</color>
+
 </resources>

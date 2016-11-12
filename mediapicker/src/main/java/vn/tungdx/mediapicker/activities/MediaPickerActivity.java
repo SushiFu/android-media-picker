@@ -2,34 +2,30 @@ package vn.tungdx.mediapicker.activities;
 
 import android.Manifest;
 import android.app.Activity;
-import android.content.DialogInterface;
-import android.content.DialogInterface.OnClickListener;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
-import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.FileObserver;
-import android.provider.MediaStore;
-import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentTransaction;
-import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 
+import com.tbruyelle.rxpermissions.RxPermissions;
+
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import rx.Observable;
 import vn.tungdx.mediapicker.CropListener;
 import vn.tungdx.mediapicker.MediaItem;
 import vn.tungdx.mediapicker.MediaOptions;
@@ -71,9 +67,7 @@ import vn.tungdx.mediapicker.utils.RecursiveFileObserver;
  * to {@link #open(Activity, int, MediaOptions)} </i></li>
  * </ul>
  */
-public class MediaPickerActivity extends AppCompatActivity implements
-        MediaSelectedListener, CropListener, FragmentManager.OnBackStackChangedListener, FragmentHost {
-    private static final String TAG = "MediaPickerActivity";
+public class MediaPickerActivity extends AppCompatActivity implements MediaSelectedListener, CropListener, FragmentManager.OnBackStackChangedListener, FragmentHost {
 
     public static final String EXTRA_MEDIA_OPTIONS = "extra_media_options";
     /**
@@ -84,23 +78,30 @@ public class MediaPickerActivity extends AppCompatActivity implements
      * before handle your logic.
      */
     public static final String EXTRA_MEDIA_SELECTED = "extra_media_selected";
+    private static final String TAG = "MediaPickerActivity";
     private static final int REQUEST_PHOTO_CAPTURE = 100;
     private static final int REQUEST_VIDEO_CAPTURE = 200;
 
     private static final String KEY_PHOTOFILE_CAPTURE = "key_photofile_capture";
-
+    private static final int PERMISSION_CAMERA = 2;
+    private static final int PERMISSION_VIDEO = 3;
     private MediaOptions mMediaOptions;
     private MenuItem mMediaSwitcher;
-    private MenuItem mPhoto;
-    private MenuItem mVideo;
     private MenuItem mDone;
-
     private File mPhotoFileCapture;
     private List<File> mFilesCreatedWhileCapturePhoto;
     private RecursiveFileObserver mFileObserver;
     private FileObserverTask mFileObserverTask;
-    private static final int PERMISSION_CAMERA              = 2;
-    private static final int PERMISSION_VIDEO               = 3;
+    private RecursiveFileObserver.OnFileCreatedListener mOnFileCreatedListener = new RecursiveFileObserver.OnFileCreatedListener() {
+
+        @Override
+        public void onFileCreate(File file) {
+            if (mFilesCreatedWhileCapturePhoto == null)
+                mFilesCreatedWhileCapturePhoto = new ArrayList<File>();
+            mFilesCreatedWhileCapturePhoto.add(file);
+        }
+    };
+
     /**
      * Start {@link MediaPickerActivity} in {@link Activity} to pick photo or
      * video that depends on {@link MediaOptions} passed.
@@ -109,8 +110,7 @@ public class MediaPickerActivity extends AppCompatActivity implements
      * @param requestCode
      * @param options
      */
-    public static void open(Activity activity, int requestCode,
-                            MediaOptions options) {
+    public static void open(Activity activity, int requestCode, MediaOptions options) {
         Intent intent = new Intent(activity, MediaPickerActivity.class);
         intent.putExtra(EXTRA_MEDIA_OPTIONS, options);
         activity.startActivityForResult(intent, requestCode);
@@ -135,10 +135,8 @@ public class MediaPickerActivity extends AppCompatActivity implements
      * @param requestCode
      * @param options
      */
-    public static void open(Fragment fragment, int requestCode,
-                            MediaOptions options) {
-        Intent intent = new Intent(fragment.getActivity(),
-                MediaPickerActivity.class);
+    public static void open(Fragment fragment, int requestCode, MediaOptions options) {
+        Intent intent = new Intent(fragment.getActivity(), MediaPickerActivity.class);
         intent.putExtra(EXTRA_MEDIA_OPTIONS, options);
         fragment.startActivityForResult(intent, requestCode);
     }
@@ -154,36 +152,54 @@ public class MediaPickerActivity extends AppCompatActivity implements
         open(fragment, requestCode, MediaOptions.createDefault());
     }
 
+    /**
+     * Get media item list selected from intent extra included in
+     * {@link Activity#onActivityResult(int, int, Intent)} of activity or fragment
+     * that open media picker.
+     *
+     * @param intent In {@link Activity#onActivityResult(int, int, Intent)} method of
+     *               activity or fragment that open media picker.
+     * @return Always return {@link ArrayList} of {@link MediaItem}. You must
+     * always check null and size of this list before handle your logic.
+     */
+    public static ArrayList<MediaItem> getMediaItemSelected(Intent intent) {
+        if (intent == null)
+            return null;
+        ArrayList<MediaItem> mediaItemList = intent.getParcelableArrayListExtra(MediaPickerActivity.EXTRA_MEDIA_SELECTED);
+        return mediaItemList;
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // TODO: not support change orientation right now (because out of
-        // memory when crop image and change orientation, must check third party
-        // to crop image again).
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         setContentView(R.layout.activity_mediapicker);
         if (savedInstanceState != null) {
-            mMediaOptions = savedInstanceState
-                    .getParcelable(EXTRA_MEDIA_OPTIONS);
-            mPhotoFileCapture = (File) savedInstanceState
-                    .getSerializable(KEY_PHOTOFILE_CAPTURE);
-        } else {
+            mMediaOptions = savedInstanceState.getParcelable(EXTRA_MEDIA_OPTIONS);
+            mPhotoFileCapture = (File)savedInstanceState.getSerializable(KEY_PHOTOFILE_CAPTURE);
+        }
+        else {
             mMediaOptions = getIntent().getParcelableExtra(EXTRA_MEDIA_OPTIONS);
             if (mMediaOptions == null) {
-                throw new IllegalArgumentException(
-                        "MediaOptions must be not null, you should use MediaPickerActivity.open(Activity activity, int requestCode,MediaOptions options) method instead.");
+                throw new IllegalArgumentException("MediaOptions must be not null, you should use MediaPickerActivity.open(Activity activity, int requestCode,MediaOptions options) method instead.");
             }
         }
         if (getActivePage() == null) {
-            getSupportFragmentManager()
-                    .beginTransaction()
-                    .replace(R.id.container,
-                            MediaPickerFragment.newInstance(mMediaOptions))
-                    .commit();
+            Observable<Boolean> request = RxPermissions
+                    .getInstance(this).request(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+            request.filter(Boolean::booleanValue)
+                   .subscribe(granted -> {
+                       getSupportFragmentManager().beginTransaction()
+                                                  .replace(R.id.container, MediaPickerFragment.newInstance(mMediaOptions))
+                                                  .commit();
+                   });
+            request.filter(aBoolean -> !aBoolean)
+                   .subscribe(notgranted -> {
+                       finish();
+                   });
         }
         getSupportFragmentManager().addOnBackStackChangedListener(this);
         if (getSupportActionBar() != null) {
-            getSupportActionBar().setBackgroundDrawable(getResources().getDrawable(R.drawable.picker_actionbar_translucent));
             getSupportActionBar().setDisplayShowTitleEnabled(false);
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
@@ -193,8 +209,6 @@ public class MediaPickerActivity extends AppCompatActivity implements
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.mediapicker_main, menu);
-        mPhoto = menu.findItem(R.id.take_photo);
-        mVideo = menu.findItem(R.id.take_video);
         mMediaSwitcher = menu.findItem(R.id.media_switcher);
         mDone = menu.findItem(R.id.done);
         syncActionbar();
@@ -215,48 +229,38 @@ public class MediaPickerActivity extends AppCompatActivity implements
         int i = item.getItemId();
         if (i == android.R.id.home) {
             finish();
-
-        } else if (i == R.id.take_photo) {
-            takePhoto();
-            return true;
-        } else if (i == R.id.take_video) {
-            takeVideo();
-            return true;
-        } else if (i == R.id.media_switcher) {
+        }
+        else if (i == R.id.media_switcher) {
             Fragment activePage = getActivePage();
-            if (mMediaOptions.canSelectPhotoAndVideo()
-                    && activePage instanceof MediaPickerFragment) {
-                MediaPickerFragment mediaPickerFragment = ((MediaPickerFragment) activePage);
+            if (mMediaOptions.canSelectPhotoAndVideo() && activePage instanceof MediaPickerFragment) {
+                MediaPickerFragment mediaPickerFragment = ((MediaPickerFragment)activePage);
                 mediaPickerFragment.switchMediaSelector();
                 syncIconMenu(mediaPickerFragment.getMediaType());
             }
             return true;
-        } else if (i == R.id.done) {
+        }
+        else if (i == R.id.done) {
             Fragment activePage;
             activePage = getActivePage();
-            boolean isPhoto = ((MediaPickerFragment) activePage)
-                    .getMediaType() == MediaItem.PHOTO;
+            boolean isPhoto = ((MediaPickerFragment)activePage).getMediaType() == MediaItem.PHOTO;
             if (isPhoto) {
-                if (mMediaOptions.isCropped()
-                        && !mMediaOptions.canSelectMultiPhoto()) {
+                if (mMediaOptions.isCropped() && !mMediaOptions.canSelectMultiPhoto()) {
                     // get first item in list (pos=0) because can only crop 1 image at same time.
-                    MediaItem mediaItem = new MediaItem(MediaItem.PHOTO,
-                            ((MediaPickerFragment) activePage)
-                                    .getMediaSelectedList().get(0)
-                                    .getUriOrigin());
-                    showCropFragment(mediaItem, mMediaOptions);
-                } else {
-                    returnBackData(((MediaPickerFragment) activePage)
-                            .getMediaSelectedList());
-                }
-            } else {
-                if (mMediaOptions.canSelectMultiVideo()) {
-                    returnBackData(((MediaPickerFragment) activePage)
-                            .getMediaSelectedList());
-                } else {
-                    // only get 1st item regardless of have many.
-                    returnVideo(((MediaPickerFragment) activePage)
+                    MediaItem mediaItem = new MediaItem(MediaItem.PHOTO, ((MediaPickerFragment)activePage)
                             .getMediaSelectedList().get(0).getUriOrigin());
+                    showCropFragment(mediaItem, mMediaOptions);
+                }
+                else {
+                    returnBackData(((MediaPickerFragment)activePage).getMediaSelectedList());
+                }
+            }
+            else {
+                if (mMediaOptions.canSelectMultiVideo()) {
+                    returnBackData(((MediaPickerFragment)activePage).getMediaSelectedList());
+                }
+                else {
+                    // only get 1st item regardless of have many.
+                    returnVideo(((MediaPickerFragment)activePage).getMediaSelectedList().get(0).getUriOrigin());
                 }
             }
             return true;
@@ -289,8 +293,6 @@ public class MediaPickerActivity extends AppCompatActivity implements
 
     private void showDone() {
         mDone.setVisible(true);
-        mPhoto.setVisible(false);
-        mVideo.setVisible(false);
         mMediaSwitcher.setVisible(false);
     }
 
@@ -298,18 +300,9 @@ public class MediaPickerActivity extends AppCompatActivity implements
         // handle media options
         if (mMediaOptions.canSelectPhotoAndVideo()) {
             mMediaSwitcher.setVisible(true);
-        } else {
+        }
+        else {
             mMediaSwitcher.setVisible(false);
-        }
-        if (mMediaOptions.canSelectPhoto()) {
-            mPhoto.setVisible(true);
-        } else {
-            mPhoto.setVisible(false);
-        }
-        if (mMediaOptions.canSelectVideo()) {
-            mVideo.setVisible(true);
-        } else {
-            mVideo.setVisible(false);
         }
     }
 
@@ -328,127 +321,9 @@ public class MediaPickerActivity extends AppCompatActivity implements
 
     private void returnBackData(List<MediaItem> mediaSelectedList) {
         Intent data = new Intent();
-        data.putParcelableArrayListExtra(EXTRA_MEDIA_SELECTED,
-                (ArrayList<MediaItem>) mediaSelectedList);
+        data.putParcelableArrayListExtra(EXTRA_MEDIA_SELECTED, (ArrayList<MediaItem>)mediaSelectedList);
         setResult(Activity.RESULT_OK, data);
         finish();
-    }
-
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode,
-                                           String permissions[], int[] grantResults) {
-        switch (requestCode) {
-            case PERMISSION_CAMERA:
-                if ((grantResults.length > 0) && (grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
-                    useCamera();
-                }
-                break;
-            case PERMISSION_VIDEO:
-                if ((grantResults.length > 0) && (grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
-                    useVideo();
-                }
-                break;
-            default:
-                break;
-            // other 'case' lines to check for other
-            // permissions this app might request
-        }
-    }
-
-    private void askPermissionCamera(){
-        int permissionCheck = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA);
-
-        if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(
-                    this, new String[]{Manifest.permission.CAMERA}, PERMISSION_CAMERA);
-        } else {
-            useCamera();
-        }
-    }
-
-    private void takePhoto() {
-        askPermissionCamera();
-    }
-
-    private void useCamera(){
-        Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
-            File file = mMediaOptions.getPhotoFile();
-            if (file == null) {
-                try {
-                    file = MediaUtils.createDefaultImageFile();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-            if (file != null) {
-                mPhotoFileCapture = file;
-                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT,
-                        Uri.fromFile(file));
-                startActivityForResult(takePictureIntent, REQUEST_PHOTO_CAPTURE);
-                mFileObserverTask = new FileObserverTask();
-                mFileObserverTask.execute();
-            }
-        }
-    }
-
-    private RecursiveFileObserver.OnFileCreatedListener mOnFileCreatedListener = new RecursiveFileObserver.OnFileCreatedListener() {
-
-        @Override
-        public void onFileCreate(File file) {
-            if (mFilesCreatedWhileCapturePhoto == null)
-                mFilesCreatedWhileCapturePhoto = new ArrayList<File>();
-            mFilesCreatedWhileCapturePhoto.add(file);
-        }
-    };
-
-    private void useVideo(){
-        final Intent takeVideoIntent = new Intent(
-                MediaStore.ACTION_VIDEO_CAPTURE);
-        if (takeVideoIntent.resolveActivity(getPackageManager()) != null) {
-            int max = mMediaOptions.getMaxVideoDuration();
-            if (max != Integer.MAX_VALUE) {
-                // /=1000 because it's must in seconds.
-                max /= 1000;
-                takeVideoIntent.putExtra(MediaStore.EXTRA_DURATION_LIMIT, max);
-                if (mMediaOptions.isShowWarningVideoDuration()) {
-                    MediaPickerErrorDialog dialog = MediaPickerErrorDialog
-                            .newInstance(MessageUtils
-                                    .getWarningMessageVideoDuration(
-                                            getApplicationContext(), max));
-                    dialog.setOnOKClickListener(new OnClickListener() {
-
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            startActivityForResult(takeVideoIntent,
-                                    REQUEST_VIDEO_CAPTURE);
-                        }
-                    });
-                    dialog.show(getSupportFragmentManager(), null);
-                } else {
-                    startActivityForResult(takeVideoIntent,
-                            REQUEST_VIDEO_CAPTURE);
-                }
-            } else {
-                startActivityForResult(takeVideoIntent, REQUEST_VIDEO_CAPTURE);
-            }
-        }
-    }
-
-    private void askPermissionVideo(){
-        int permissionCheck = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA);
-
-        if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(
-                    this, new String[]{Manifest.permission.CAMERA}, PERMISSION_VIDEO);
-        } else {
-            useVideo();
-        }
-    }
-
-    private void takeVideo() {
-        askPermissionVideo();
     }
 
     /**
@@ -457,21 +332,18 @@ public class MediaPickerActivity extends AppCompatActivity implements
      * default image by camera than extra output.
      */
     private void tryCorrectPhotoFileCaptured() {
-        if (mPhotoFileCapture == null || mFilesCreatedWhileCapturePhoto == null
-                || mFilesCreatedWhileCapturePhoto.size() <= 0)
+        if (mPhotoFileCapture == null || mFilesCreatedWhileCapturePhoto == null ||
+            mFilesCreatedWhileCapturePhoto.size() <= 0)
             return;
         long captureSize = mPhotoFileCapture.length();
         for (File file : mFilesCreatedWhileCapturePhoto) {
-            if (MediaUtils
-                    .isImageExtension(MediaUtils.getFileExtension(file))
-                    && file.length() >= captureSize
-                    && !file.equals(mPhotoFileCapture)) {
+            if (MediaUtils.isImageExtension(MediaUtils.getFileExtension(file))
+                && file.length() >= captureSize && !file.equals(mPhotoFileCapture)) {
                 boolean value = mPhotoFileCapture.delete();
                 mPhotoFileCapture = file;
                 Log.i(TAG,
-                        String.format(
-                                "Try correct photo file: Delete duplicate photos in [%s] [%s]",
-                                mPhotoFileCapture, value));
+                      String.format("Try correct photo file: Delete duplicate photos in [%s] [%s]",
+                                    mPhotoFileCapture, value));
                 return;
             }
         }
@@ -487,15 +359,13 @@ public class MediaPickerActivity extends AppCompatActivity implements
                 case REQUEST_PHOTO_CAPTURE:
                     tryCorrectPhotoFileCaptured();
                     if (mPhotoFileCapture != null) {
-                        MediaUtils.galleryAddPic(getApplicationContext(),
-                                mPhotoFileCapture);
+                        MediaUtils.galleryAddPic(getApplicationContext(), mPhotoFileCapture);
                         if (mMediaOptions.isCropped()) {
-                            MediaItem item = new MediaItem(MediaItem.PHOTO,
-                                    Uri.fromFile(mPhotoFileCapture));
+                            MediaItem item = new MediaItem(MediaItem.PHOTO, Uri.fromFile(mPhotoFileCapture));
                             showCropFragment(item, mMediaOptions);
-                        } else {
-                            MediaItem item = new MediaItem(MediaItem.PHOTO,
-                                    Uri.fromFile(mPhotoFileCapture));
+                        }
+                        else {
+                            MediaItem item = new MediaItem(MediaItem.PHOTO, Uri.fromFile(mPhotoFileCapture));
                             ArrayList<MediaItem> list = new ArrayList<MediaItem>();
                             list.add(item);
                             returnBackData(list);
@@ -513,8 +383,7 @@ public class MediaPickerActivity extends AppCompatActivity implements
 
     private void showCropFragment(MediaItem mediaItem, MediaOptions options) {
         Fragment fragment = PhotoCropFragment.newInstance(mediaItem, options);
-        FragmentTransaction transaction = getSupportFragmentManager()
-                .beginTransaction();
+        FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
         transaction.replace(R.id.container, fragment);
         transaction.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_OPEN);
         transaction.addToBackStack(null);
@@ -543,15 +412,19 @@ public class MediaPickerActivity extends AppCompatActivity implements
         Fragment fragment = getActivePage();
         if (fragment instanceof PhotoCropFragment) {
             hideAllOptionsMenu();
-            getSupportActionBar().hide();
-        } else if (fragment instanceof MediaPickerFragment) {
-            getSupportActionBar().show();
+            if (getSupportActionBar() != null)
+                getSupportActionBar().hide();
+        }
+        else if (fragment instanceof MediaPickerFragment) {
+            if (getSupportActionBar() != null)
+                getSupportActionBar().show();
             syncMediaOptions();
-            MediaPickerFragment pickerFragment = (MediaPickerFragment) fragment;
+            MediaPickerFragment pickerFragment = (MediaPickerFragment)fragment;
             syncIconMenu(pickerFragment.getMediaType());
             if (pickerFragment.hasMediaSelected()) {
                 showDone();
-            } else {
+            }
+            else {
                 mDone.setVisible(false);
             }
         }
@@ -562,10 +435,6 @@ public class MediaPickerActivity extends AppCompatActivity implements
     }
 
     private void hideAllOptionsMenu() {
-        if (mPhoto != null)
-            mPhoto.setVisible(false);
-        if (mVideo != null)
-            mVideo.setVisible(false);
         if (mMediaSwitcher != null)
             mMediaSwitcher.setVisible(false);
         if (mDone != null)
@@ -585,23 +454,20 @@ public class MediaPickerActivity extends AppCompatActivity implements
         // try get duration using MediaPlayer. (Should get duration using
         // MediaPlayer before use Uri because some devices can get duration by
         // Uri or not exactly. Ex: Asus Memo Pad8)
-        long duration = MediaUtils.getDuration(getApplicationContext(),
-                MediaUtils.getRealVideoPathFromURI(getContentResolver(), videoUri));
+        long duration = MediaUtils.getDuration(getApplicationContext(), MediaUtils.getRealVideoPathFromURI(getContentResolver(), videoUri));
         if (duration == 0) {
             // try get duration one more, by uri of video. Note: Some time can
             // not get duration by Uri after record video.(It's usually happen
             // in HTC
             // devices 2.3, maybe others)
-            duration = MediaUtils
-                    .getDuration(getApplicationContext(), videoUri);
+            duration = MediaUtils.getDuration(getApplicationContext(), videoUri);
         }
         // accept delta about < 1000 milliseconds. (ex: 10769 is still accepted
         // if limit is 10000)
-        if (mMediaOptions.getMaxVideoDuration() != Integer.MAX_VALUE
-                && duration >= mMediaOptions.getMaxVideoDuration() + 1000) {
+        if (mMediaOptions.getMaxVideoDuration() != Integer.MAX_VALUE && duration >= mMediaOptions.getMaxVideoDuration() + 1000) {
             return 0;
-        } else if (duration == 0
-                || duration < mMediaOptions.getMinVideoDuration()) {
+        }
+        else if (duration == 0 || duration < mMediaOptions.getMinVideoDuration()) {
             return -1;
         }
         return 1;
@@ -612,14 +478,12 @@ public class MediaPickerActivity extends AppCompatActivity implements
         switch (code) {
             // not found. should never happen. Do nothing when happen.
             case -2:
-
                 break;
             // smaller than min
             case -1:
                 // in seconds
                 int duration = mMediaOptions.getMinVideoDuration() / 1000;
-                String msg = MessageUtils.getInvalidMessageMinVideoDuration(
-                        getApplicationContext(), duration);
+                String msg = MessageUtils.getInvalidMessageMinVideoDuration(getApplicationContext(), duration);
                 showVideoInvalid(msg);
                 break;
 
@@ -627,8 +491,7 @@ public class MediaPickerActivity extends AppCompatActivity implements
             case 0:
                 // in seconds.
                 duration = mMediaOptions.getMaxVideoDuration() / 1000;
-                msg = MessageUtils.getInvalidMessageMaxVideoDuration(
-                        getApplicationContext(), duration);
+                msg = MessageUtils.getInvalidMessageMaxVideoDuration(getApplicationContext(), duration);
                 showVideoInvalid(msg);
                 break;
             // ok
@@ -645,44 +508,8 @@ public class MediaPickerActivity extends AppCompatActivity implements
     }
 
     private void showVideoInvalid(String msg) {
-        MediaPickerErrorDialog errorDialog = MediaPickerErrorDialog
-                .newInstance(msg);
+        MediaPickerErrorDialog errorDialog = MediaPickerErrorDialog.newInstance(msg);
         errorDialog.show(getSupportFragmentManager(), null);
-    }
-
-    /**
-     * Get media item list selected from intent extra included in
-     * {@link Activity#onActivityResult(int, int, Intent)} of activity or fragment
-     * that open media picker.
-     *
-     * @param intent In {@link Activity#onActivityResult(int, int, Intent)} method of
-     *               activity or fragment that open media picker.
-     * @return Always return {@link ArrayList} of {@link MediaItem}. You must
-     * always check null and size of this list before handle your logic.
-     */
-    public static ArrayList<MediaItem> getMediaItemSelected(Intent intent) {
-        if (intent == null)
-            return null;
-        ArrayList<MediaItem> mediaItemList = intent
-                .getParcelableArrayListExtra(MediaPickerActivity.EXTRA_MEDIA_SELECTED);
-        return mediaItemList;
-    }
-
-    private class FileObserverTask extends AsyncTask<Void, Void, Void> {
-
-        @Override
-        protected Void doInBackground(Void... params) {
-            if (isCancelled()) return null;
-            if (mFileObserver == null) {
-                mFileObserver = new RecursiveFileObserver(Environment
-                        .getExternalStorageDirectory().getAbsolutePath(),
-                        FileObserver.CREATE);
-                mFileObserver
-                        .setFileCreatedListener(mOnFileCreatedListener);
-            }
-            mFileObserver.startWatching();
-            return null;
-        }
     }
 
     private void cancelFileObserverTask() {
@@ -696,6 +523,20 @@ public class MediaPickerActivity extends AppCompatActivity implements
         if (mFileObserver != null) {
             mFileObserver.stopWatching();
             mFileObserver = null;
+        }
+    }
+
+    private class FileObserverTask extends AsyncTask<Void, Void, Void> {
+
+        @Override
+        protected Void doInBackground(Void... params) {
+            if (isCancelled()) return null;
+            if (mFileObserver == null) {
+                mFileObserver = new RecursiveFileObserver(Environment.getExternalStorageDirectory().getAbsolutePath(), FileObserver.CREATE);
+                mFileObserver.setFileCreatedListener(mOnFileCreatedListener);
+            }
+            mFileObserver.startWatching();
+            return null;
         }
     }
 }

@@ -44,8 +44,8 @@ import vn.tungdx.mediapicker.widget.PickerImageView;
  * item from list depends on {@link MediaOptions} that passed when open media
  * picker.
  */
-public class MediaPickerFragment extends BaseFragment implements
-        LoaderManager.LoaderCallbacks<Cursor>, OnItemClickListener {
+public class MediaPickerFragment extends BaseFragment implements LoaderManager.LoaderCallbacks<Cursor>, OnItemClickListener {
+
     private static final String LOADER_EXTRA_URI = "loader_extra_uri";
     private static final String LOADER_EXTRA_PROJECT = "loader_extra_project";
     private static final String KEY_MEDIA_TYPE = "media_type";
@@ -78,26 +78,24 @@ public class MediaPickerFragment extends BaseFragment implements
     @Override
     public void onAttach(Activity activity) {
         super.onAttach(activity);
-        mMediaSelectedListener = (MediaSelectedListener) activity;
+        mMediaSelectedListener = (MediaSelectedListener)activity;
     }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         if (savedInstanceState != null) {
-            mMediaOptions = savedInstanceState
-                    .getParcelable(MediaPickerActivity.EXTRA_MEDIA_OPTIONS);
+            mMediaOptions = savedInstanceState.getParcelable(MediaPickerActivity.EXTRA_MEDIA_OPTIONS);
             mMediaType = savedInstanceState.getInt(KEY_MEDIA_TYPE);
-            mMediaSelectedList = savedInstanceState
-                    .getParcelableArrayList(KEY_MEDIA_SELECTED_LIST);
+            mMediaSelectedList = savedInstanceState.getParcelableArrayList(KEY_MEDIA_SELECTED_LIST);
             mSavedInstanceState = savedInstanceState;
-        } else {
-            mMediaOptions = getArguments().getParcelable(
-                    MediaPickerActivity.EXTRA_MEDIA_OPTIONS);
-            if (mMediaOptions.canSelectPhotoAndVideo()
-                    || mMediaOptions.canSelectPhoto()) {
+        }
+        else {
+            mMediaOptions = getArguments().getParcelable(MediaPickerActivity.EXTRA_MEDIA_OPTIONS);
+            if (mMediaOptions.canSelectPhotoAndVideo() || mMediaOptions.canSelectPhoto()) {
                 mMediaType = MediaItem.PHOTO;
-            } else {
+            }
+            else {
                 mMediaType = MediaItem.VIDEO;
             }
             mMediaSelectedList = mMediaOptions.getMediaListSelected();
@@ -114,10 +112,8 @@ public class MediaPickerFragment extends BaseFragment implements
     }
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-                             Bundle savedInstanceState) {
-        View root = inflater.inflate(R.layout.fragment_mediapicker, container,
-                false);
+    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        View root = inflater.inflate(R.layout.fragment_mediapicker, container, false);
         initView(root);
         return root;
     }
@@ -127,19 +123,18 @@ public class MediaPickerFragment extends BaseFragment implements
         super.onActivityCreated(savedInstanceState);
         if (mMediaType == MediaItem.PHOTO) {
             requestPhotos(false);
-        } else {
+        }
+        else {
             requestVideos(false);
         }
     }
 
     private void requestPhotos(boolean isRestart) {
-        requestMedia(Images.Media.EXTERNAL_CONTENT_URI,
-                MediaUtils.PROJECT_PHOTO, isRestart);
+        requestMedia(Images.Media.EXTERNAL_CONTENT_URI, MediaUtils.PROJECT_PHOTO, isRestart);
     }
 
     private void requestVideos(boolean isRestart) {
-        requestMedia(Video.Media.EXTERNAL_CONTENT_URI,
-                MediaUtils.PROJECT_VIDEO, isRestart);
+        requestMedia(Video.Media.EXTERNAL_CONTENT_URI, MediaUtils.PROJECT_VIDEO, isRestart);
     }
 
     private void requestMedia(Uri uri, String[] projects, boolean isRestart) {
@@ -156,14 +151,12 @@ public class MediaPickerFragment extends BaseFragment implements
     public void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
         if (mGridView != null) {
-            mSavedInstanceState.putParcelable(KEY_GRID_STATE,
-                    mGridView.onSaveInstanceState());
+            mSavedInstanceState.putParcelable(KEY_GRID_STATE, mGridView.onSaveInstanceState());
         }
         mSavedInstanceState.putParcelable(
                 MediaPickerActivity.EXTRA_MEDIA_OPTIONS, mMediaOptions);
         mSavedInstanceState.putInt(KEY_MEDIA_TYPE, mMediaType);
-        mSavedInstanceState.putParcelableArrayList(KEY_MEDIA_SELECTED_LIST,
-                (ArrayList<MediaItem>) mMediaSelectedList);
+        mSavedInstanceState.putParcelableArrayList(KEY_MEDIA_SELECTED_LIST, (ArrayList<MediaItem>)mMediaSelectedList);
         outState.putAll(mSavedInstanceState);
     }
 
@@ -182,9 +175,9 @@ public class MediaPickerFragment extends BaseFragment implements
         }
         switchToData();
         if (mMediaAdapter == null) {
-            mMediaAdapter = new MediaAdapter(mContext, cursor, 0,
-                    mMediaImageLoader, mMediaType, mMediaOptions);
-        } else {
+            mMediaAdapter = new MediaAdapter(mContext, cursor, 0, mMediaImageLoader, mMediaType, mMediaOptions);
+        }
+        else {
             mMediaAdapter.setMediaType(mMediaType);
             mMediaAdapter.swapCursor(cursor);
         }
@@ -215,26 +208,26 @@ public class MediaPickerFragment extends BaseFragment implements
     }
 
     @Override
-    public void onItemClick(AdapterView<?> parent, View view, int position,
-                            long id) {
+    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
         Object object = parent.getAdapter().getItem(position);
         if (object instanceof Cursor) {
             Uri uri;
             if (mMediaType == MediaItem.PHOTO) {
-                uri = MediaUtils.getPhotoUri((Cursor) object);
-            } else {
-                uri = MediaUtils.getVideoUri((Cursor) object);
+                uri = MediaUtils.getPhotoUri((Cursor)object);
             }
-            PickerImageView pickerImageView = (PickerImageView) view
+            else {
+                uri = MediaUtils.getVideoUri((Cursor)object);
+            }
+            PickerImageView pickerImageView = (PickerImageView)view
                     .findViewById(R.id.thumbnail);
             MediaItem mediaItem = new MediaItem(mMediaType, uri);
             mMediaAdapter.updateMediaSelected(mediaItem, pickerImageView);
             mMediaSelectedList = mMediaAdapter.getMediaSelectedList();
 
             if (mMediaAdapter.hasSelected()) {
-                mMediaSelectedListener.onHasSelected(mMediaAdapter
-                        .getMediaSelectedList());
-            } else {
+                mMediaSelectedListener.onHasSelected(mMediaAdapter.getMediaSelectedList());
+            }
+            else {
                 mMediaSelectedListener.onHasNoSelected();
             }
         }
@@ -245,7 +238,8 @@ public class MediaPickerFragment extends BaseFragment implements
             return;
         if (mMediaType == MediaItem.PHOTO) {
             mMediaType = MediaItem.VIDEO;
-        } else {
+        }
+        else {
             mMediaType = MediaItem.PHOTO;
         }
         switch (mMediaType) {
@@ -272,8 +266,7 @@ public class MediaPickerFragment extends BaseFragment implements
     public void onDestroyView() {
         super.onDestroyView();
         if (mGridView != null) {
-            mSavedInstanceState.putParcelable(KEY_GRID_STATE,
-                    mGridView.onSaveInstanceState());
+            mSavedInstanceState.putParcelable(KEY_GRID_STATE, mGridView.onSaveInstanceState());
             mGridView = null;
         }
         if (mMediaAdapter != null) {
@@ -298,16 +291,15 @@ public class MediaPickerFragment extends BaseFragment implements
     }
 
     private void initView(View view) {
-        mGridView = (HeaderGridView) view.findViewById(R.id.grid);
+        mGridView = (HeaderGridView)view.findViewById(R.id.grid);
         View header = new View(getActivity());
-        ViewGroup.LayoutParams params = new LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                Utils.getActionbarHeight(getActivity()));
+        ViewGroup.LayoutParams params = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                                                         Utils.getActionbarHeight(getActivity()));
         header.setLayoutParams(params);
         mGridView.addHeaderView(header);
 
         mGridView.setOnItemClickListener(this);
-        mNoItemView = (TextView) view.findViewById(R.id.no_data);
+        mNoItemView = (TextView)view.findViewById(R.id.no_data);
 
         // get the view tree observer of the grid and set the height and numcols
         // dynamically
@@ -316,12 +308,10 @@ public class MediaPickerFragment extends BaseFragment implements
                     @Override
                     public void onGlobalLayout() {
                         if (mMediaAdapter != null
-                                && mMediaAdapter.getNumColumns() == 0) {
-                            final int numColumns = (int) Math.floor(mGridView
-                                    .getWidth() / (mPhotoSize + mPhotoSpacing));
+                            && mMediaAdapter.getNumColumns() == 0) {
+                            final int numColumns = (int)Math.floor(mGridView.getWidth() / (mPhotoSize + mPhotoSpacing));
                             if (numColumns > 0) {
-                                final int columnWidth = (mGridView.getWidth() / numColumns)
-                                        - mPhotoSpacing;
+                                final int columnWidth = (mGridView.getWidth() / numColumns) - mPhotoSpacing;
                                 mMediaAdapter.setNumColumns(numColumns);
                                 mMediaAdapter.setItemHeight(columnWidth);
                             }
