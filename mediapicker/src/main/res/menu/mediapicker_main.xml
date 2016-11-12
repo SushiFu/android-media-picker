@@ -5,13 +5,14 @@
 
     <item
         android:id="@id/media_switcher"
-        android:icon="@drawable/gallery_photo"
+        android:icon="@drawable/ic_picture_white"
         android:title="@string/picker_switch_media"
         app:showAsAction="ifRoom"/>
 
     <group>
         <item
             android:id="@id/done"
+            android:icon="@drawable/ic_check_white"
             android:title="@string/picker_done_capital"
             android:visible="false"
             app:showAsAction="ifRoom"/>

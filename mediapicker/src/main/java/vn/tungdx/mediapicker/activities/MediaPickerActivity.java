@@ -309,10 +309,10 @@ public class MediaPickerActivity extends AppCompatActivity implements MediaSelec
     private void syncIconMenu(int mediaType) {
         switch (mediaType) {
             case MediaItem.PHOTO:
-                mMediaSwitcher.setIcon(R.drawable.gallery_video);
+                mMediaSwitcher.setIcon(R.drawable.ic_movie_white);
                 break;
             case MediaItem.VIDEO:
-                mMediaSwitcher.setIcon(R.drawable.gallery_photo);
+                mMediaSwitcher.setIcon(R.drawable.ic_picture_white);
                 break;
             default:
                 break;
