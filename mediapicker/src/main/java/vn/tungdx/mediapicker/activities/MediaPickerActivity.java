@@ -6,10 +6,7 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.Environment;
-import android.os.FileObserver;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentTransaction;
@@ -83,32 +80,16 @@ public class MediaPickerActivity extends AppCompatActivity implements MediaSelec
     private static final int REQUEST_VIDEO_CAPTURE = 200;
 
     private static final String KEY_PHOTOFILE_CAPTURE = "key_photofile_capture";
-    private static final int PERMISSION_CAMERA = 2;
-    private static final int PERMISSION_VIDEO = 3;
     private MediaOptions mMediaOptions;
     private MenuItem mMediaSwitcher;
     private MenuItem mDone;
     private File mPhotoFileCapture;
     private List<File> mFilesCreatedWhileCapturePhoto;
     private RecursiveFileObserver mFileObserver;
-    private FileObserverTask mFileObserverTask;
-    private RecursiveFileObserver.OnFileCreatedListener mOnFileCreatedListener = new RecursiveFileObserver.OnFileCreatedListener() {
-
-        @Override
-        public void onFileCreate(File file) {
-            if (mFilesCreatedWhileCapturePhoto == null)
-                mFilesCreatedWhileCapturePhoto = new ArrayList<File>();
-            mFilesCreatedWhileCapturePhoto.add(file);
-        }
-    };
 
     /**
      * Start {@link MediaPickerActivity} in {@link Activity} to pick photo or
      * video that depends on {@link MediaOptions} passed.
-     *
-     * @param activity
-     * @param requestCode
-     * @param options
      */
     public static void open(Activity activity, int requestCode, MediaOptions options) {
         Intent intent = new Intent(activity, MediaPickerActivity.class);
@@ -119,9 +100,6 @@ public class MediaPickerActivity extends AppCompatActivity implements MediaSelec
     /**
      * Start {@link MediaPickerActivity} in {@link Activity} with default media
      * option: {@link MediaOptions#createDefault()}
-     *
-     * @param activity
-     * @param requestCode
      */
     public static void open(Activity activity, int requestCode) {
         open(activity, requestCode, MediaOptions.createDefault());
@@ -130,10 +108,6 @@ public class MediaPickerActivity extends AppCompatActivity implements MediaSelec
     /**
      * Start {@link MediaPickerActivity} in {@link Fragment} to pick photo or
      * video that depends on {@link MediaOptions} passed.
-     *
-     * @param fragment
-     * @param requestCode
-     * @param options
      */
     public static void open(Fragment fragment, int requestCode, MediaOptions options) {
         Intent intent = new Intent(fragment.getActivity(), MediaPickerActivity.class);
@@ -144,9 +118,6 @@ public class MediaPickerActivity extends AppCompatActivity implements MediaSelec
     /**
      * Start {@link MediaPickerActivity} in {@link Fragment} with default media
      * option: {@link MediaOptions#createDefault()}
-     *
-     * @param fragment
-     * @param requestCode
      */
     public static void open(Fragment fragment, int requestCode) {
         open(fragment, requestCode, MediaOptions.createDefault());
@@ -165,8 +136,7 @@ public class MediaPickerActivity extends AppCompatActivity implements MediaSelec
     public static ArrayList<MediaItem> getMediaItemSelected(Intent intent) {
         if (intent == null)
             return null;
-        ArrayList<MediaItem> mediaItemList = intent.getParcelableArrayListExtra(MediaPickerActivity.EXTRA_MEDIA_SELECTED);
-        return mediaItemList;
+        return intent.getParcelableArrayListExtra(MediaPickerActivity.EXTRA_MEDIA_SELECTED);
     }
 
     @Override
@@ -219,7 +189,6 @@ public class MediaPickerActivity extends AppCompatActivity implements MediaSelec
     protected void onDestroy() {
         super.onDestroy();
         getSupportFragmentManager().removeOnBackStackChangedListener(this);
-        cancelFileObserverTask();
         stopWatchingFile();
         mFilesCreatedWhileCapturePhoto = null;
     }
@@ -352,7 +321,6 @@ public class MediaPickerActivity extends AppCompatActivity implements MediaSelec
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        cancelFileObserverTask();
         stopWatchingFile();
         if (resultCode == Activity.RESULT_OK) {
             switch (requestCode) {
@@ -366,7 +334,7 @@ public class MediaPickerActivity extends AppCompatActivity implements MediaSelec
                         }
                         else {
                             MediaItem item = new MediaItem(MediaItem.PHOTO, Uri.fromFile(mPhotoFileCapture));
-                            ArrayList<MediaItem> list = new ArrayList<MediaItem>();
+                            ArrayList<MediaItem> list = new ArrayList<>();
                             list.add(item);
                             returnBackData(list);
                         }
@@ -392,7 +360,7 @@ public class MediaPickerActivity extends AppCompatActivity implements MediaSelec
 
     @Override
     public void onSuccess(MediaItem mediaItem) {
-        List<MediaItem> list = new ArrayList<MediaItem>();
+        List<MediaItem> list = new ArrayList<>();
         list.add(mediaItem);
         returnBackData(list);
     }
@@ -444,7 +412,6 @@ public class MediaPickerActivity extends AppCompatActivity implements MediaSelec
     /**
      * Check video duration valid or not with options.
      *
-     * @param videoUri
      * @return 1 if valid, otherwise is invalid. -2: not found, 0 larger than
      * accepted, -1 smaller than accepted.
      */
@@ -497,7 +464,7 @@ public class MediaPickerActivity extends AppCompatActivity implements MediaSelec
             // ok
             case 1:
                 MediaItem item = new MediaItem(MediaItem.VIDEO, videoUri);
-                ArrayList<MediaItem> list = new ArrayList<MediaItem>();
+                ArrayList<MediaItem> list = new ArrayList<>();
                 list.add(item);
                 returnBackData(list);
                 break;
@@ -512,31 +479,10 @@ public class MediaPickerActivity extends AppCompatActivity implements MediaSelec
         errorDialog.show(getSupportFragmentManager(), null);
     }
 
-    private void cancelFileObserverTask() {
-        if (mFileObserverTask != null) {
-            mFileObserverTask.cancel(true);
-            mFileObserver = null;
-        }
-    }
-
     private void stopWatchingFile() {
         if (mFileObserver != null) {
             mFileObserver.stopWatching();
             mFileObserver = null;
-        }
-    }
-
-    private class FileObserverTask extends AsyncTask<Void, Void, Void> {
-
-        @Override
-        protected Void doInBackground(Void... params) {
-            if (isCancelled()) return null;
-            if (mFileObserver == null) {
-                mFileObserver = new RecursiveFileObserver(Environment.getExternalStorageDirectory().getAbsolutePath(), FileObserver.CREATE);
-                mFileObserver.setFileCreatedListener(mOnFileCreatedListener);
-            }
-            mFileObserver.startWatching();
-            return null;
         }
     }
 }
