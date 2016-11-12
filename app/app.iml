@@ -129,6 +129,9 @@
     <orderEntry type="library" exported="" name="support-core-utils-25.0.0" level="project" />
     <orderEntry type="module" module-name="mediapicker" exported="" />
     <orderEntry type="library" exported="" name="cropper-1.0.1" level="project" />
+    <orderEntry type="library" exported="" name="rxpermissions-0.8.2" level="project" />
     <orderEntry type="library" exported="" name="universal-image-loader-1.9.3" level="project" />
+    <orderEntry type="library" exported="" name="rxjava-1.2.2" level="project" />
+    <orderEntry type="library" exported="" name="rxandroid-1.2.1" level="project" />
   </component>
 </module>
