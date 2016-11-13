@@ -3,6 +3,6 @@
 
     <dimen name="picker_photo_size">100dp</dimen>
     <dimen name="picker_photo_spacing">4dp</dimen>
-    <dimen name="picker_border_size">3dp</dimen>
+    <dimen name="picker_border_size">1dp</dimen>
 
 </resources>
