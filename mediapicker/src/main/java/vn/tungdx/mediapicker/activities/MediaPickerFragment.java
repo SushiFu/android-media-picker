@@ -1,5 +1,6 @@
 package vn.tungdx.mediapicker.activities;
 
+import android.Manifest;
 import android.app.Activity;
 import android.database.Cursor;
 import android.net.Uri;
@@ -20,6 +21,8 @@ import android.widget.AbsListView.LayoutParams;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.TextView;
+
+import com.tbruyelle.rxpermissions.RxPermissions;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -121,12 +124,17 @@ public class MediaPickerFragment extends BaseFragment implements LoaderManager.L
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
-        if (mMediaType == MediaItem.PHOTO) {
-            requestPhotos(false);
-        }
-        else {
-            requestVideos(false);
-        }
+        RxPermissions.getInstance(getContext())
+                     .request(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                     .subscribe(granted -> {
+                         if (granted)
+                             if (mMediaType == MediaItem.PHOTO)
+                                 requestPhotos(false);
+                             else
+                                 requestVideos(false);
+                         else
+                             getActivity().finish();
+                     });
     }
 
     private void requestPhotos(boolean isRestart) {

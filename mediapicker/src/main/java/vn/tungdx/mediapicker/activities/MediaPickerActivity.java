@@ -1,6 +1,5 @@
 package vn.tungdx.mediapicker.activities;
 
-import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
@@ -16,13 +15,10 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 
-import com.tbruyelle.rxpermissions.RxPermissions;
-
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-import rx.Observable;
 import vn.tungdx.mediapicker.CropListener;
 import vn.tungdx.mediapicker.MediaItem;
 import vn.tungdx.mediapicker.MediaOptions;
@@ -155,18 +151,10 @@ public class MediaPickerActivity extends AppCompatActivity implements MediaSelec
             }
         }
         if (getActivePage() == null) {
-            Observable<Boolean> request = RxPermissions
-                    .getInstance(this).request(Manifest.permission.WRITE_EXTERNAL_STORAGE);
-            request.filter(Boolean::booleanValue)
-                   .subscribe(granted -> {
-                       getSupportFragmentManager().beginTransaction()
-                                                  .replace(R.id.container, MediaPickerFragment.newInstance(mMediaOptions))
-                                                  .commit();
-                   });
-            request.filter(aBoolean -> !aBoolean)
-                   .subscribe(notgranted -> {
-                       finish();
-                   });
+            getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.container, MediaPickerFragment.newInstance(mMediaOptions))
+                    .commit();
         }
         getSupportFragmentManager().addOnBackStackChangedListener(this);
         if (getSupportActionBar() != null) {
