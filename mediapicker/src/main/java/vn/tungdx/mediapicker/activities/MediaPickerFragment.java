@@ -1,15 +1,19 @@
 package vn.tungdx.mediapicker.activities;
 
 import android.Manifest;
-import android.app.Activity;
+import android.content.Context;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.provider.MediaStore;
 import android.provider.MediaStore.Images;
 import android.provider.MediaStore.MediaColumns;
 import android.provider.MediaStore.Video;
+import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.LoaderManager;
 import android.support.v4.content.CursorLoader;
 import android.support.v4.content.Loader;
@@ -21,8 +25,6 @@ import android.widget.AbsListView.LayoutParams;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.TextView;
-
-import com.tbruyelle.rxpermissions.RxPermissions;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -79,7 +81,7 @@ public class MediaPickerFragment extends BaseFragment implements LoaderManager.L
     }
 
     @Override
-    public void onAttach(Activity activity) {
+    public void onAttach(Context activity) {
         super.onAttach(activity);
         mMediaSelectedListener = (MediaSelectedListener)activity;
     }
@@ -95,7 +97,9 @@ public class MediaPickerFragment extends BaseFragment implements LoaderManager.L
         }
         else {
             mMediaOptions = getArguments().getParcelable(MediaPickerActivity.EXTRA_MEDIA_OPTIONS);
-            if (mMediaOptions.canSelectPhotoAndVideo() || mMediaOptions.canSelectPhoto()) {
+            if (mMediaOptions == null)
+                return;
+            else if (mMediaOptions.canSelectPhotoAndVideo() || mMediaOptions.canSelectPhoto()) {
                 mMediaType = MediaItem.PHOTO;
             }
             else {
@@ -124,17 +128,33 @@ public class MediaPickerFragment extends BaseFragment implements LoaderManager.L
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
-        RxPermissions.getInstance(getContext())
-                     .request(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                     .subscribe(granted -> {
-                         if (granted)
-                             if (mMediaType == MediaItem.PHOTO)
-                                 requestPhotos(false);
-                             else
-                                 requestVideos(false);
-                         else
-                             getActivity().finish();
-                     });
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (ActivityCompat.checkSelfPermission(getActivity(), Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+                request();
+            }
+            else {
+                requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
+            }
+        }
+        else {
+            request();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (grantResults[0] == PackageManager.PERMISSION_GRANTED)
+            request();
+        else
+            getActivity().finish();
+    }
+
+    private void request() {
+        if (mMediaType == MediaItem.PHOTO)
+            requestPhotos(false);
+        else
+            requestVideos(false);
     }
 
     private void requestPhotos(boolean isRestart) {
@@ -311,20 +331,20 @@ public class MediaPickerFragment extends BaseFragment implements LoaderManager.L
 
         // get the view tree observer of the grid and set the height and numcols
         // dynamically
-        mGridView.getViewTreeObserver().addOnGlobalLayoutListener(
-                new ViewTreeObserver.OnGlobalLayoutListener() {
-                    @Override
-                    public void onGlobalLayout() {
-                        if (mMediaAdapter != null
-                            && mMediaAdapter.getNumColumns() == 0) {
-                            final int numColumns = (int)Math.floor(mGridView.getWidth() / (mPhotoSize + mPhotoSpacing));
-                            if (numColumns > 0) {
-                                final int columnWidth = (mGridView.getWidth() / numColumns) - mPhotoSpacing;
-                                mMediaAdapter.setNumColumns(numColumns);
-                                mMediaAdapter.setItemHeight(columnWidth);
-                            }
-                        }
+        mGridView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+            @Override
+            public void onGlobalLayout() {
+                if (mMediaAdapter != null
+                    && mMediaAdapter.getNumColumns() == 0) {
+                    final int numColumns = (int)Math.floor(mGridView.getWidth() / (mPhotoSize + mPhotoSpacing));
+                    if (numColumns > 0) {
+                        final int columnWidth = (mGridView.getWidth() / numColumns) - mPhotoSpacing;
+                        mMediaAdapter.setNumColumns(numColumns);
+                        //noinspection SuspiciousNameCombination
+                        mMediaAdapter.setItemHeight(columnWidth);
                     }
-                });
+                }
+            }
+        });
     }
 }

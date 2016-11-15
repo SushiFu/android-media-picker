@@ -1,17 +1,9 @@
-plugins {
-    id "me.tatarka.retrolambda" version "3.3.1"
-}
-
 apply plugin: 'com.android.library'
 
+//noinspection GroovyMissingReturnStatement
 android {
     compileSdkVersion 25
-    buildToolsVersion '25.0.0'
-
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
+    buildToolsVersion "25.0.0"
     defaultConfig {
         minSdkVersion 19
         targetSdkVersion 25
@@ -28,11 +20,7 @@ android {
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
-    compile 'com.android.support:appcompat-v7:25.0.0'
+    compile 'com.android.support:appcompat-v7:25.0.1'
     compile 'com.edmodo:cropper:1.0.1'
     compile 'com.nostra13.universalimageloader:universal-image-loader:1.9.3'
-    // RxJava
-    compile 'io.reactivex:rxandroid:1.2.1'
-    compile 'io.reactivex:rxjava:1.2.2'
-    compile 'com.tbruyelle.rxpermissions:rxpermissions:0.8.2@aar'
 }
